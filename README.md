@@ -1,11 +1,13 @@
-# Inline AI Chat - IntelliJ Plugin
+# Inline AI Chat - JetBrains Plugin
 
 ![Inline AI Chat](docs/inline.png)
 
 <!-- Plugin description -->
 Inline AI Chat embeds OpenRouter model conversations directly in your code editor.
 
+
 It integrates AI chat functionality into your workflow without requiring a separate popup window.
+
 
 Ideal for use in .md and .txt files for rapid brainstorming.
 
