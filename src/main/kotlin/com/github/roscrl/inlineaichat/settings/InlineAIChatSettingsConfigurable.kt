@@ -1,10 +1,22 @@
 package com.github.roscrl.inlineaichat.settings
 
+import com.intellij.icons.AllIcons
+import com.intellij.openapi.actionSystem.ActionManager
+import com.intellij.openapi.keymap.KeymapUtil
 import com.intellij.openapi.options.Configurable
+import com.intellij.openapi.ui.ComboBox
 import com.intellij.openapi.ui.DialogPanel
+import com.intellij.openapi.ui.DialogWrapper
+import com.intellij.openapi.ui.Messages
+import com.intellij.ui.CollectionListModel
 import com.intellij.ui.HyperlinkLabel
 import com.intellij.ui.JBColor
+import com.intellij.ui.SimpleListCellRenderer
+import com.intellij.ui.ToolbarDecorator
 import com.intellij.ui.components.*
+import com.intellij.ui.components.JBPasswordField
+import com.intellij.ui.components.JBTextArea
+import com.intellij.ui.components.fields.ExtendableTextField
 import com.intellij.ui.dsl.builder.AlignX
 import com.intellij.ui.dsl.builder.panel
 import com.intellij.util.ui.JBUI
@@ -12,17 +24,6 @@ import com.intellij.util.ui.UIUtil
 import java.awt.BorderLayout
 import java.awt.Dimension
 import javax.swing.*
-import com.intellij.ui.CollectionListModel
-import com.intellij.ui.ToolbarDecorator
-import com.intellij.openapi.keymap.KeymapUtil
-import com.intellij.openapi.actionSystem.ActionManager
-import com.intellij.openapi.ui.Messages
-import com.intellij.ui.SimpleListCellRenderer
-import com.intellij.openapi.ui.ComboBox
-import com.intellij.ui.components.fields.ExtendableTextField
-import javax.swing.DefaultComboBoxModel
-import com.intellij.openapi.ui.DialogWrapper
-import com.intellij.icons.AllIcons
 
 class InlineAIChatSettingsConfigurable : Configurable {
     private var settingsComponent: InlineAIChatSettingsComponent? = null
@@ -39,8 +40,8 @@ class InlineAIChatSettingsConfigurable : Configurable {
         val component = settingsComponent ?: return false
         val settings = InlineAIChatSettingsState.instance
         return settings.openRouterApiKey != component.getOpenRouterApiKey() ||
-               settings.selectedModel != component.getSelectedModel() ||
-               settings.systemPrompt != component.getSystemPrompt()
+                settings.selectedModel != component.getSelectedModel() ||
+                settings.systemPrompt != component.getSystemPrompt()
     }
 
     override fun apply() {
@@ -183,7 +184,7 @@ class InlineAIChatSettingsComponent {
 class ManageModelsDialog : DialogWrapper(true) {
     private val modelsList = JBList<String>()
     private val modelsModel = CollectionListModel<String>()
-    
+
     init {
         title = "Manage Models"
         modelsList.model = modelsModel
@@ -191,29 +192,29 @@ class ManageModelsDialog : DialogWrapper(true) {
         refreshModels()
         init()
     }
-    
+
     private fun refreshModels() {
         modelsModel.removeAll()
         InlineAIChatSettingsState.instance.availableModels.forEach { modelsModel.add(it) }
     }
-    
+
     private fun createModelListRenderer() = object : SimpleListCellRenderer<String>() {
         override fun customize(list: JList<out String>, value: String?, index: Int, selected: Boolean, hasFocus: Boolean) {
             if (value == null) return
             text = value
-            
+
             if (value == InlineAIChatSettingsState.instance.selectedModel) {
                 icon = AllIcons.Actions.Checked
                 toolTipText = "Currently active model"
             }
         }
     }
-    
+
     override fun createCenterPanel(): JComponent {
         val panel = JPanel(BorderLayout())
-        
+
         val decorator = ToolbarDecorator.createDecorator(modelsList)
-            .setAddAction { 
+            .setAddAction {
                 val result = Messages.showInputDialog(
                     "Enter Model Name",
                     "Add Custom Model",
@@ -237,25 +238,25 @@ class ManageModelsDialog : DialogWrapper(true) {
                         )
                         return@setRemoveAction
                     }
-                    
+
                     if (selectedModel == InlineAIChatSettingsState.instance.selectedModel) {
                         val newModel = InlineAIChatSettingsState.instance.models.first { it != selectedModel }
                         InlineAIChatSettingsState.instance.selectedModel = newModel
                     }
-                    
+
                     InlineAIChatSettingsState.instance.models.remove(selectedModel)
                     refreshModels()
                 }
             }
             .createPanel()
-        
+
         panel.add(decorator, BorderLayout.CENTER)
-        
+
         val modelsLink = HyperlinkLabel("View available models on OpenRouter").apply {
             setHyperlinkTarget("https://openrouter.ai/models")
         }
         panel.add(modelsLink, BorderLayout.SOUTH)
-        
+
         panel.preferredSize = JBUI.size(400, 300)
         return panel
     }

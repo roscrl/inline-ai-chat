@@ -19,12 +19,22 @@ import com.intellij.openapi.project.Project
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.job
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.addJsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-import org.json.JSONException
-import org.json.JSONObject
 import java.io.IOException
 import java.time.Instant
 import java.util.concurrent.TimeUnit
@@ -34,11 +44,11 @@ import kotlin.coroutines.coroutineContext
 
 class StreamTextAction : AnAction() {
     companion object {
-        private val AI_ICON = com.intellij.icons.AllIcons.Actions.Lightning
+        private val DEFAULT_ICON = com.intellij.icons.AllIcons.Actions.Lightning
     }
 
     private class AIGutterIconRenderer(private val timestamp: String) : GutterIconRenderer() {
-        override fun getIcon(): Icon = AI_ICON
+        override fun getIcon(): Icon = DEFAULT_ICON
         override fun equals(other: Any?): Boolean = other is AIGutterIconRenderer
         override fun hashCode(): Int = 0
         override fun getTooltipText(): String = "${InlineAIChatSettingsState.instance.selectedModel} Response ($timestamp)"
@@ -57,6 +67,13 @@ class StreamTextAction : AnAction() {
     private val JSON = "application/json; charset=utf-8".toMediaType()
     private val logger = Logger.getInstance(StreamTextAction::class.java)
     private val rateLimitLock = Object()
+    private val Json = Json { ignoreUnknownKeys = true }
+
+    init {
+        templatePresentation.text = "Inline AI Chat"
+        templatePresentation.description = "Sends file content and streams AI response to the editor"
+        templatePresentation.icon = DEFAULT_ICON
+    }
 
     override fun update(e: AnActionEvent) {
         val hasEditor = e.getData(CommonDataKeys.EDITOR) != null
@@ -101,6 +118,15 @@ class StreamTextAction : AnAction() {
                         streamAIResponse(project, editor, startOffset, context, indicator)
                     }
                 } catch (e: Exception) {
+                    // Ignore cancellation exceptions if they were user-initiated
+                    if (e is CancellationException ||
+                        (e.cause is CancellationException) ||
+                        (e.message == null && indicator.isCanceled)
+                    ) {
+                        logger.debug("Request cancelled by user")
+                        return@run
+                    }
+
                     logger.error("Unhandled exception in streamAIResponse", e)
                     NotificationUtil.showError(
                         "Error",
@@ -128,7 +154,7 @@ class StreamTextAction : AnAction() {
         ApplicationManager.getApplication().invokeAndWait {
             // Remove any existing AI gutter icon at the exact same offset
             val existingHighlighters = editor.markupModel.allHighlighters
-            
+
             existingHighlighters.forEach { highlighter ->
                 if (highlighter.startOffset == initialOffset) {
                     val renderer = highlighter.gutterIconRenderer
@@ -172,19 +198,24 @@ class StreamTextAction : AnAction() {
             }
 
             val requestBody = try {
-                val body = JSONObject().apply {
+                val jsonBody = buildJsonObject {
                     put("model", settings.selectedModel)
-                    put(
-                        "messages", listOf(
-                            mapOf("role" to "system", "content" to settings.systemPrompt),
-                            mapOf("role" to "user", "content" to context)
-                        )
-                    )
                     put("stream", true)
-                }.toString()
+                    putJsonArray("messages") {
+                        addJsonObject {
+                            put("role", "system")
+                            put("content", settings.systemPrompt)
+                        }
+                        addJsonObject {
+                            put("role", "user")
+                            put("content", context)
+                        }
+                    }
+                }
+                val bodyString = Json.encodeToString(jsonBody)
                 logger.debug("Created request body for model: ${settings.selectedModel}")
-                body.toRequestBody(JSON)
-            } catch (e: JSONException) {
+                bodyString.toRequestBody(JSON)
+            } catch (e: Exception) {
                 logger.error("Failed to create request body", e)
                 throw IOException("Failed to create request: ${e.message}")
             }
@@ -219,9 +250,9 @@ class StreamTextAction : AnAction() {
                     if (response.code == 429) {
                         // Extract retry time from response if available
                         val retrySeconds = try {
-                            val error = JSONObject(errorBody).getJSONObject("error")
-                            val metadata = error.optJSONObject("metadata")
-                            val rawError = metadata?.optString("raw") ?: ""
+                            val errorJson = Json.decodeFromString<JsonObject>(errorBody)
+                            val metadata = errorJson["metadata"]?.jsonObject
+                            val rawError = metadata?.get("raw")?.jsonPrimitive?.contentOrNull ?: ""
                             if (rawError.contains("Retry after")) {
                                 rawError.substringAfter("Retry after")
                                     .substringBefore("seconds")
@@ -278,38 +309,39 @@ class StreamTextAction : AnAction() {
                             }
 
                             try {
-                                val json = JSONObject(data)
+                                val json = Json.decodeFromString<JsonObject>(data)
                                 // Handle rate limit error if present
                                 if (handleRateLimit(json, totalCharsWritten, currentOffset, project, editor)) {
                                     return
                                 }
 
                                 val content = when {
-                                    json.has("choices") -> {
+                                    json.containsKey("choices") -> {
                                         logger.debug("Using OpenAI format")
-                                        json.getJSONArray("choices")
-                                            .getJSONObject(0)
-                                            .getJSONObject("delta")
-                                            .optString("content")
+                                        val choices = json["choices"]?.jsonArray
+                                        if (choices != null && choices.size > 0)
+                                            choices[0].jsonObject["delta"]?.jsonObject?.get("content")?.jsonPrimitive?.contentOrNull
+                                                ?: ""
+                                        else ""
                                     }
 
-                                    json.has("response") -> {
+                                    json.containsKey("response") -> {
                                         logger.debug("Using DeepSeek format")
-                                        json.getString("response")
+                                        json["response"]?.jsonPrimitive?.contentOrNull ?: ""
                                     }
 
-                                    json.has("text") -> {
+                                    json.containsKey("text") -> {
                                         logger.debug("Using fallback text format")
-                                        json.getString("text")
+                                        json["text"]?.jsonPrimitive?.contentOrNull ?: ""
                                     }
 
-                                    json.has("content") -> {
+                                    json.containsKey("content") -> {
                                         logger.debug("Using fallback content format")
-                                        json.getString("content")
+                                        json["content"]?.jsonPrimitive?.contentOrNull ?: ""
                                     }
 
                                     else -> {
-                                        val keys = json.keys().asSequence().toList()
+                                        val keys = json.keys.toList()
                                         logger.warn("Unexpected response format. Available keys: $keys, Full response: $data")
                                         if (totalCharsWritten == 0) {
                                             WriteCommandAction.runWriteCommandAction(project) {
@@ -345,7 +377,7 @@ class StreamTextAction : AnAction() {
                                         buffer = ""
                                     }
                                 }
-                            } catch (e: JSONException) {
+                            } catch (e: Exception) {
                                 val errorMsg = e.message ?: "Unknown JSON parsing error"
                                 logger.warn("Failed to parse streaming response: $errorMsg, Raw data: $data")
                                 if (totalCharsWritten == 0) {
@@ -397,17 +429,17 @@ class StreamTextAction : AnAction() {
      * Returns true if rate limit was detected and handled.
      */
     private fun handleRateLimit(
-        json: JSONObject,
+        json: JsonObject,
         totalCharsWritten: Int,
         currentOffset: Int,
         project: Project,
         editor: Editor
     ): Boolean {
-        if (json.has("error")) {
-            val error = json.getJSONObject("error")
-            if (error.getInt("code") == 429) {
-                val metadata = error.optJSONObject("metadata")
-                val rawError = metadata?.optString("raw") ?: ""
+        if (json.containsKey("error")) {
+            val error = json["error"]?.jsonObject
+            if (error != null && error["code"]?.jsonPrimitive?.intOrNull == 429) {
+                val metadata = error["metadata"]?.jsonObject
+                val rawError = metadata?.get("raw")?.jsonPrimitive?.contentOrNull ?: ""
                 logger.warn("Rate limit response: code=429, metadata=$metadata, rawError=$rawError")
                 val retrySeconds = if (rawError.contains("Retry after")) {
                     val extracted = rawError.substringAfter("Retry after")
@@ -512,13 +544,13 @@ class StreamTextAction : AnAction() {
                             val progressFraction = 1.0 - (remainingSeconds.toDouble() / seconds.toDouble())
                             indicator.fraction = progressFraction
                             indicator.text = "Rate limit: $timeDisplay remaining"
-                            
+
                             // Break into smaller sleep intervals to be more responsive to cancellation
                             for (i in 0..9) {
                                 if (indicator.isCanceled) break
                                 Thread.sleep(100)
                             }
-                            
+
                             remainingSeconds--
                         }
 
@@ -544,10 +576,10 @@ class StreamTextAction : AnAction() {
                                     if (editor != null) {
                                         // Use ActionManager to properly execute the action
                                         val actionManager = com.intellij.openapi.actionSystem.ActionManager.getInstance()
-                                        val action = actionManager.getAction("com.github.roscrl.inlineaichat.actions.StreamText")
-                                        
+                                        val action = actionManager.getAction("com.github.roscrl.inlineaichat.actions.StreamTextAction")
+
                                         cleanupRateLimit()
-                                        
+
                                         // Use the proper API method for executing actions
                                         actionManager.tryToExecute(
                                             action,

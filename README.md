@@ -3,17 +3,15 @@
 ![Inline AI Chat](docs/inline.png)
 
 <!-- Plugin description -->
-Inline AI Chat embeds OpenRouter model conversations directly in your code editor.
+Inline AI Chat embeds OpenRouter model conversations into your main editor.
 
-It integrates AI chat functionality into your code editor without requiring a separate popup window.
+Designed for brainstorming within `.md` and `.txt` files with your familiar keybindings.
 
-Ideal for use in .md and .txt files for rapid brainstorming.
-
-## Key Features
+## Features
 
 - **Streaming:** AI responses are streamed to you in real time.
-- **Multiple Models:** Choose from a variety of AI models via OpenRouter.
-- **Model Switching:** Quickly swap between models using a handy popup menu.
+- **Multiple Models:** Choose any AI model from OpenRouter.
+- **Model Switching:** Quickly swap between models.
 - **Rate Limit Handling:** Built-in retries handle rate limiting.
 - **Customisable System Prompt:** Configure your system prompt.
 - **Visual Gutter Annotations:** Identify AI responses by the lightning bolt icon.
