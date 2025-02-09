@@ -1,0 +1,11 @@
+{
+  "defaultModels": [
+    "google/gemini-2.0-flash-exp:free",
+    "google/gemini-2.0-flash-001",
+    "anthropic/claude-3.5-sonnet",
+    "openai/gpt-4",
+    "deepseek/deepseek-chat",
+    "deepseek/deepseek-r1",
+    "deepseek/deepseek-r1:free"
+  ]
+} 

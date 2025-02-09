@@ -1,18 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <!-- Plugin Configuration File. Read more: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html -->
 <idea-plugin>
-    <id>com.github.roscrl.llm</id>
-    <name>llm</name>
-    <vendor>roscrl</vendor>
+    <id>com.github.roscrl.inlineaichat</id>
+    <name>Inline AI Chat</name>
+    <vendor email="your.email@example.com" url="https://github.com/roscrl/inline-ai-chat">roscrl</vendor>
+
+    <version>1.0.0</version>
+    <idea-version since-build="233" until-build="241.*"/>
+
+    <description><![CDATA[
+        <p>Inline AI Chat embeds OpenRouter model conversations directly in your code editor.</p>
+        
+        <h3>Key Features:</h3>
+        <ul>
+            <li><b>Streaming:</b> AI responses are streamed to you in real time</li>
+            <li><b>Multiple Models:</b> Choose from a variety of AI models via OpenRouter</li>
+            <li><b>Quick Model Switching:</b> Quickly swap between models using a handy popup menu</li>
+            <li><b>Automatic Rate Limit Handling:</b> Built-in retries handle rate limiting for a smoother experience</li>
+            <li><b>Customizable System Prompts:</b> Configure your system prompt to match your workflow</li>
+            <li><b>Visual Gutter Annotations:</b> Identify AI responses with timestamped lightning bolt icons</li>
+        </ul>
+        
+        <h3>Getting Started:</h3>
+        <ol>
+            <li>Get an API key from <a href="https://openrouter.ai">OpenRouter</a></li>
+            <li>Configure your API key in Settings → Tools → Inline AI Chat Settings</li>
+            <li>Use Shift+Ctrl+S to trigger AI chat or Shift+Ctrl+P for quick settings</li>
+        </ol>
+    ]]></description>
+
+    <change-notes><![CDATA[
+        <h3>1.0.0</h3>
+        <ul>
+            <li>Initial release</li>
+            <li>Real-time streaming of AI responses</li>
+            <li>Support for multiple OpenRouter models</li>
+            <li>Quick settings access</li>
+            <li>Rate limit handling</li>
+            <li>Gutter icons with timestamps</li>
+        </ul>
+    ]]></change-notes>
 
     <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.modules.lang</depends>
 
     <resource-bundle>messages.MyBundle</resource-bundle>
 
-    <extensions defaultExtensionNs="com.intellij">
-        <toolWindow factoryClass="com.github.roscrl.llm.toolWindow.MyToolWindowFactory" id="MyToolWindow"/>
-    </extensions>
+    <actions>
+        <action id="com.github.roscrl.inlineaichat.actions.StreamTextAction"
+                class="com.github.roscrl.inlineaichat.actions.StreamTextAction"
+                text="Inline AI Chat"
+                description="Sends file content and streams AI response to the editor">
+            <keyboard-shortcut first-keystroke="shift control S" keymap="$default"/>
+        </action>
+        <action id="com.github.roscrl.inlineaichat.actions.QuickSettingsAction"
+                class="com.github.roscrl.inlineaichat.actions.QuickSettingsAction"
+                text="Inline AI Chat Settings"
+                description="Quick access to Inline AI Chat settings">
+            <keyboard-shortcut first-keystroke="shift control P" keymap="$default"/>
+        </action>
+    </actions>
 
-    <applicationListeners>
-        <listener class="com.github.roscrl.llm.listeners.MyApplicationActivationListener" topic="com.intellij.openapi.application.ApplicationActivationListener"/>
-    </applicationListeners>
+    <extensions defaultExtensionNs="com.intellij">
+        <applicationService serviceImplementation="com.github.roscrl.inlineaichat.settings.InlineAIChatSettingsState"/>
+        <applicationConfigurable
+                parentId="tools"
+                instance="com.github.roscrl.inlineaichat.settings.InlineAIChatSettingsConfiguration"
+                id="com.github.roscrl.inlineaichat.settings.InlineAIChatSettingsConfiguration"
+                displayName="Inline AI Chat Settings"/>
+        
+        <notificationGroup 
+            id="Inline AI Chat Plugin Notifications"
+            displayType="BALLOON"
+            bundle="messages.MyBundle"
+            key="notification.group.name"
+            title="Inline AI Chat"
+            isLogByDefault="true"
+        />
+    </extensions>
 </idea-plugin>

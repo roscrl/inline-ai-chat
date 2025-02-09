@@ -9,6 +9,7 @@ plugins {
     alias(libs.plugins.changelog) // Gradle Changelog Plugin
     alias(libs.plugins.qodana) // Gradle Qodana Plugin
     alias(libs.plugins.kover) // Gradle Kover Plugin
+//    kotlin("jvm")
 }
 
 group = providers.gradleProperty("pluginGroup").get()
@@ -16,7 +17,7 @@ version = providers.gradleProperty("pluginVersion").get()
 
 // Set the JVM language level used to build the project.
 kotlin {
-    jvmToolchain(17)
+    jvmToolchain(21)
 }
 
 // Configure project's dependencies
@@ -48,6 +49,10 @@ dependencies {
         zipSigner()
         testFramework(TestFrameworkType.Platform)
     }
+    implementation(kotlin("stdlib-jdk8"))
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.squareup.okhttp3:okhttp-sse:4.12.0")
+    implementation("org.json:json:20240303")
 }
 
 // Configure IntelliJ Platform Gradle Plugin - read more: https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin-extension.html
@@ -83,7 +88,7 @@ intellijPlatform {
 
         ideaVersion {
             sinceBuild = providers.gradleProperty("pluginSinceBuild")
-            untilBuild = providers.gradleProperty("pluginUntilBuild")
+//            untilBuild = providers.gradleProperty("pluginUntilBuild")
         }
     }
 
@@ -133,6 +138,19 @@ tasks {
     publishPlugin {
         dependsOn(patchChangelog)
     }
+
+    runIde {
+        // Enable debug logging for our package
+        systemProperty("idea.log.debug.categories", "#com.github.roscrl.inlineaichat")
+        
+        // Optional: configure JVM debug options
+        jvmArgs = listOf(
+            "-Xmx2048m",
+            "-XX:+HeapDumpOnOutOfMemoryError",
+            "-Didea.is.internal=true",
+            "-Didea.debug.mode=true"
+        )
+    }
 }
 
 intellijPlatformTesting {
@@ -154,4 +172,9 @@ intellijPlatformTesting {
             }
         }
     }
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
 }
