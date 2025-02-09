@@ -5,9 +5,7 @@
 <!-- Plugin description -->
 Inline AI Chat embeds OpenRouter model conversations directly in your code editor.
 
-
-It integrates AI chat functionality into your workflow without requiring a separate popup window.
-
+It integrates AI chat functionality into your code editor without requiring a separate popup window.
 
 Ideal for use in .md and .txt files for rapid brainstorming.
 
