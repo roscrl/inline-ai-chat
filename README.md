@@ -36,7 +36,7 @@ Ideal for use in .md and .txt files for rapid brainstorming.
 ## Usage
 
 1. Trigger the AI chat using the designated keyboard shortcut or action.
-2. Enjoy the real-time AI responses streamed directly into your document.
+2. Real-time AI responses are streamed directly into your file.
 
 ## Requirements
 
